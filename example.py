@@ -1,4 +1,4 @@
 import gogoanimeapi
 import converter
 
-gogoanimeapi.download_episode("https://www04.gogoanimes.tv/accel-world-episode-1")
+gogoanimeapi.download_anime("https://www04.gogoanimes.tv/category/naruto")

@@ -1,0 +1,2 @@
+Requires ffmpeg installed and in path to convert the files to mkv from the ts stream file (In a m3u8 playlist)
+If errors persist, ensure the created files won't exceed the directory filename length size of 260~ characters (including all folders it is inside)

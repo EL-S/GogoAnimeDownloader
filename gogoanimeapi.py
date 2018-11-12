@@ -2,12 +2,13 @@ import os
 import requests
 from bs4 import BeautifulSoup
 from tornado import ioloop, httpclient
+import converter
 
 directory = "Episodes/"
 path = ""
 
 #program settings
-silent = False
+silent = True
 
 #anime settings
 ep_start = str(0)
@@ -163,9 +164,9 @@ def handle_ts_file_response(response):
         i -= 1
         if i == 0: #all pages loaded
             ioloop.IOLoop.instance().stop()
-            print("Download Complete")
+            #print("Download Complete")
 
-def download_episode(url,directory="Episodes/",headers={"Origin": "https://vidstreaming.io", "Referer": "https://vidstreaming.io"}):
+def download_episode(url,directory="Episodes/",convert=True,output_format=".mkv",overwrite=True,keep_source_stream=False,headers={"Origin": "https://vidstreaming.io", "Referer": "https://vidstreaming.io"}):
     try:
         video_src,anime_name,anime_series_name = get_video_src(url)
         if not silent:
@@ -190,14 +191,31 @@ def download_episode(url,directory="Episodes/",headers={"Origin": "https://vidst
         print("Downloading Episode Files..")
         download_ts_files(m3u8_links,url_domain,headers,path)
         
-        print("Finished Episode")
-        
+        print("Download Source Files Complete")
+        if convert:
+            playlist_path = path+"playlist.m3u8"
+            if not silent:
+                print("Playlist Path:",playlist_path)
+            converter.convert_file(playlist_path,output_format,overwrite,keep_source_stream)
     except Exception as e:
         print(e)
         download_episode(url)
 
-def download_anime(ep_start,ep_end,anime_id,default_ep):
-    url = "https://www04.gogoanimes.tv/load-list-episode?ep_start="+ep_start+"&ep_end="+ep_end+"&id="+anime_id+"&default_ep="+default_ep
+def download_anime(anime_id="help",ep_start="0",ep_end="5000",default_ep="1",convert=True,output_format=".mkv",overwrite=True,keep_source_stream=False):
+    url = anime_id
+    if not isinstance(anime_id, int): #if not an anime_id
+        print(anime_id,url)
+        req = requests.get(url) #not really an anime_id
+        page = req.text
+        soup = BeautifulSoup(page, "lxml")
+        anime_id = str(soup.find("input", attrs={"id": "movie_id"}).get("value")) #gets anime id
+        default_ep = str(soup.find("input", attrs={"id": "default_ep"}).get("value")) #gets default episode
+        episode_page = soup.find("ul", attrs={"id": "episode_page"}).findAll("a")
+        ep_start = str(episode_page[0].get("ep_start"))
+        ep_end = str(episode_page[-1].get("ep_end"))
+        url = "https://www04.gogoanimes.tv/load-list-episode?ep_start="+ep_start+"&ep_end="+ep_end+"&id="+anime_id+"&default_ep="+default_ep
+    else:
+        url = "https://www04.gogoanimes.tv/load-list-episode?ep_start="+ep_start+"&ep_end="+ep_end+"&id="+anime_id+"&default_ep="+default_ep
 
     req = requests.get(url)
     page = req.text
@@ -212,7 +230,7 @@ def download_anime(ep_start,ep_end,anime_id,default_ep):
         for episode in episodes:
             if not silent:
                 print("Episode Link:",episode)
-            download_episode(episode)
+            download_episode(episode,convert,output_format,overwrite,keep_source_stream)
     else:
         print("No Anime with ID:",anime_id)
 
