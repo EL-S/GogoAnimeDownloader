@@ -79,17 +79,18 @@ def get_m3u8_playlist_src(m3u8_src,quality_preferred,quality,headers):
         print("Options:",m3u8_stream_options)
     try:
         flag = False
-        for quality in m3u8_stream_options:
-            #print(quality)
-            if quality_preferred in quality:
-                m3u8_quality_playlist = quality
-                flag = True
+        if quality_preferred != "default":
+            for quality_setting in m3u8_stream_options:
+                quality_setting_string = quality_setting.split(".")[2]
+                if quality_preferred == quality_setting_string:
+                    m3u8_quality_playlist = quality_setting_string
+                    flag = True
         quality_ordered = []
         quality_list = ["360","480","720","1080"]
         for theorectical_quality in quality_list:
-            for quality in m3u8_stream_options:
-                if theorectical_quality in quality:
-                    quality_ordered.append(quality)
+            for quality_setting in m3u8_stream_options:
+                if theorectical_quality in quality_setting:
+                    quality_ordered.append(quality_setting)
         if flag == False:
             if quality == "highest":
                 m3u8_quality_playlist = quality_ordered[-1:][0]
@@ -100,7 +101,9 @@ def get_m3u8_playlist_src(m3u8_src,quality_preferred,quality,headers):
                 m3u8_quality_playlist = quality_ordered[index_num]
             else: #lowest or something else
                 m3u8_quality_playlist = quality_ordered[0]
-        quality_chosen = m3u8_quality_playlist.split(".")[2]
+            quality_chosen = m3u8_quality_playlist.split(".")[2]
+        else:
+            quality_chosen = m3u8_quality_playlist
         print("Selected Quality:",str(quality_chosen)+"p")
     except:
         m3u8_quality_playlist = m3u8_stream_options[0] #maybe need another [0]
@@ -132,8 +135,8 @@ def save_playlist_information(m3u8_src,directory,anime_name,m3u8_quality_playlis
         file.write(m3u8_playlist)
     return path
 
-def download_ts_files(m3u8_links,url_domain,headers,path):
-    global i,threads
+def download_ts_files(m3u8_links,url_domain,headers,path,threads):
+    global i
     http_client = httpclient.AsyncHTTPClient(force_instance=True,defaults=dict(user_agent="Mozilla/5.0"),max_clients=threads)
     for sub_link in m3u8_links:
         url = url_domain+sub_link
@@ -165,7 +168,7 @@ def handle_ts_file_response(response):
             ioloop.IOLoop.instance().stop()
             #print("Download Complete")
 
-def download_episode(url,directory="Episodes/",convert=True,output_format=".mkv",overwrite=True,keep_source_stream=False,silent=True,quality_preferred="1080",quality="highest",headers={"Origin": "https://vidstreaming.io", "Referer": "https://vidstreaming.io"}):
+def download_episode(url,directory="Episodes/",convert=True,output_format=".mkv",overwrite=True,keep_source_stream=False,silent=True,quality_preferred="default",quality="highest",threads="100",headers={"Origin": "https://vidstreaming.io", "Referer": "https://vidstreaming.io"}):
     try:
         video_src,anime_name,anime_series_name = get_video_src(url)
         if not silent_setting:
@@ -188,7 +191,7 @@ def download_episode(url,directory="Episodes/",convert=True,output_format=".mkv"
         path = save_playlist_information(m3u8_src,directory,anime_name,m3u8_quality_playlist,m3u8_playlist,m3u8_stream,anime_series_name)
 
         print("Downloading Episode Files..")
-        download_ts_files(m3u8_links,url_domain,headers,path)
+        download_ts_files(m3u8_links,url_domain,headers,path,int(threads))
         
         print("Download Source Files Complete")
         if convert:
@@ -200,7 +203,7 @@ def download_episode(url,directory="Episodes/",convert=True,output_format=".mkv"
         print(e)
         download_episode(url)
 
-def download_anime(anime_id,ep_start="default",ep_end="default",directory=directory,default_ep="1",convert=True,output_format=".mkv",overwrite=True,keep_source_stream=False,silent=True,quality_preferred="1080",quality="highest"):
+def download_anime(anime_id,ep_start="default",ep_end="default",directory=directory,default_ep="1",convert=True,output_format=".mkv",overwrite=True,keep_source_stream=False,silent=True,quality_preferred="default",quality="highest",threads="100"):
     global silent_setting
     url = anime_id
     if silent == False:
@@ -243,22 +246,21 @@ def download_anime(anime_id,ep_start="default",ep_end="default",directory=direct
         for episode in episodes:
             if not silent:
                 print("Episode Link:",episode)
-            download_episode(url=episode,directory=directory,convert=convert,output_format=output_format,overwrite=overwrite,keep_source_stream=keep_source_stream,silent=silent,quality_preferred=quality_preferred,quality=quality)
+            download_episode(url=episode,directory=directory,convert=convert,output_format=output_format,overwrite=overwrite,keep_source_stream=keep_source_stream,silent=silent,quality_preferred=quality_preferred,quality=quality,threads=threads)
     else:
         print("No Anime with ID:",anime_id)
 
-def download_multiple_anime(start_anime_id=start_anime_id,end_anime_id=end_anime_id,ep_start="default",ep_end="default",directory=directory,default_ep="1",convert=True,output_format=".mkv",overwrite=True,keep_source_stream=False,silent=True,quality_preferred="1080",quality="highest"):
+def download_multiple_anime(start_anime_id=start_anime_id,end_anime_id=end_anime_id,ep_start="default",ep_end="default",directory=directory,default_ep="1",convert=True,output_format=".mkv",overwrite=True,keep_source_stream=False,silent=True,quality_preferred="default",quality="highest",threads="100"):
     try:
         start_anime_id=int(start_anime_id)
         end_anime_id=int(end_anime_id)
         for anime_id in range(start_anime_id,end_anime_id):
             try:
-                download_anime(str(anime_id),ep_start,ep_end,directory,default_ep,convert,output_format,overwrite,keep_source_stream,silent,quality_preferred,quality)
+                download_anime(str(anime_id),ep_start,ep_end,directory,default_ep,convert,output_format,overwrite,keep_source_stream,silent,quality_preferred,quality,threads)
             except Exception as e:
                 print("No Anime(?)",e)
     except:
         print("Invalid Anime ID's")
-
 init()
 if __name__ == "__main__":
-    download_multiple_anime(start_anime_id=start_anime_id,end_anime_id=end_anime_id,ep_start="default",ep_end="default",directory=directory,default_ep="1",convert=True,output_format=".mkv",overwrite=True,keep_source_stream=False,silent=True,quality_preferred="1080",quality="highest")
+    download_multiple_anime(start_anime_id=start_anime_id,end_anime_id=end_anime_id,ep_start="default",ep_end="default",directory=directory,default_ep="1",convert=True,output_format=".mkv",overwrite=True,keep_source_stream=False,silent=True,quality_preferred="1080",quality="highest",threads="100")
