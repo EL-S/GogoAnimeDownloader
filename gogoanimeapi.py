@@ -44,7 +44,8 @@ def anime_folder(title,episode_title):
         os.mkdir(title+"/"+episode_title)
 
 def get_video_src(url):
-    req = requests.get(url)
+    headers = {"User-Agent":"letmein 5.0 / user"}
+    req = requests.get(url, headers=headers)
     page = req.text
     soup = BeautifulSoup(page, "lxml")
     anime_name = soup.find("div", attrs={"class": "title_name"}).find("h2").text.strip().replace(":","").replace("  ","")
@@ -54,10 +55,12 @@ def get_video_src(url):
         print("Anime Name:",anime_series_name)
     #video_src = "https://"+soup.find("div", attrs={"class": "play-video"}).find("iframe").get("src")[2:]
     video_src = soup.find("li", attrs={"class": "vidcdn"}).find("a").get("data-video")
+    back_up_src = soup.find("li", attrs={"class": "mp4"}).find("a").get("data-video")
     return video_src,anime_name,anime_series_name
 
 def get_m3u8_initiator_src(video_src):
-    req = requests.get(video_src)
+    headers = {"User-Agent":"letmein 5.0 / user"}
+    req = requests.get(video_src, headers=headers)
     page = req.text
     soup = BeautifulSoup(page, "lxml")
     js = soup.findAll("script")[3].text #sometimes [4].text
@@ -83,7 +86,7 @@ def get_m3u8_playlist_src(m3u8_src,quality_preferred,quality,headers):
             for quality_setting in m3u8_stream_options:
                 quality_setting_string = quality_setting.split(".")[2]
                 if quality_preferred == quality_setting_string:
-                    m3u8_quality_playlist = quality_setting_string
+                    m3u8_quality_playlist = quality_setting
                     flag = True
         quality_ordered = []
         quality_list = ["360","480","720","1080"]
@@ -103,7 +106,7 @@ def get_m3u8_playlist_src(m3u8_src,quality_preferred,quality,headers):
                 m3u8_quality_playlist = quality_ordered[0]
             quality_chosen = m3u8_quality_playlist.split(".")[2]
         else:
-            quality_chosen = m3u8_quality_playlist
+            quality_chosen = m3u8_quality_playlist.split(".")[2]
         print("Selected Quality:",str(quality_chosen)+"p")
     except:
         m3u8_quality_playlist = m3u8_stream_options[0] #maybe need another [0]
@@ -136,14 +139,20 @@ def save_playlist_information(m3u8_src,directory,anime_name,m3u8_quality_playlis
     return path
 
 def download_ts_files(m3u8_links,url_domain,headers,path,threads):
-    global i
-    http_client = httpclient.AsyncHTTPClient(force_instance=True,defaults=dict(user_agent="Mozilla/5.0"),max_clients=threads)
-    for sub_link in m3u8_links:
-        url = url_domain+sub_link
-        request = httpclient.HTTPRequest(url.strip(),headers=headers,method='GET',connect_timeout=10000,request_timeout=10000)
-        http_client.fetch(request,handle_ts_file_response)
-        i += 1
-    ioloop.IOLoop.instance().start()
+    try:
+        global i
+        i = 0
+        http_client = httpclient.AsyncHTTPClient(force_instance=True,defaults=dict(user_agent="Mozilla/5.0"),max_clients=threads)
+        for sub_link in m3u8_links:
+            url = url_domain+sub_link
+            request = httpclient.HTTPRequest(url.strip(),headers=headers,method='GET',connect_timeout=10000,request_timeout=10000)
+            http_client.fetch(request,handle_ts_file_response)
+            i += 1
+        ioloop.IOLoop.instance().start()
+    except:
+        print("Reattempting Downloading Episode Files..")
+        download_ts_files(m3u8_links,url_domain,headers,path,threads)
+        
 
 def handle_ts_file_response(response):
     global i,path,headers
@@ -169,6 +178,8 @@ def handle_ts_file_response(response):
             #print("Download Complete")
 
 def download_episode(url,directory="Episodes/",convert=True,output_format=".mkv",overwrite=True,keep_source_stream=False,silent=True,quality_preferred="default",quality="highest",threads="100",headers={"Origin": "https://vidstreaming.io", "Referer": "https://vidstreaming.io"}):
+    global silent_setting
+    silent_setting = silent
     try:
         video_src,anime_name,anime_series_name = get_video_src(url)
         if not silent_setting:
@@ -205,7 +216,8 @@ def download_episode(url,directory="Episodes/",convert=True,output_format=".mkv"
 
 def download_anime(anime_id,ep_start="default",ep_end="default",directory=directory,default_ep="1",convert=True,output_format=".mkv",overwrite=True,keep_source_stream=False,silent=True,quality_preferred="default",quality="highest",threads="100"):
     global silent_setting
-    url = anime_id
+    silent_setting = silent
+    url = anime_id #turn most of this into a function to return the episodes available (useful for checking for new episodes)
     if silent == False:
         silent_setting = silent
     try:
@@ -251,6 +263,8 @@ def download_anime(anime_id,ep_start="default",ep_end="default",directory=direct
         print("No Anime with ID:",anime_id)
 
 def download_multiple_anime(start_anime_id=start_anime_id,end_anime_id=end_anime_id,ep_start="default",ep_end="default",directory=directory,default_ep="1",convert=True,output_format=".mkv",overwrite=True,keep_source_stream=False,silent=True,quality_preferred="default",quality="highest",threads="100"):
+    global silent_setting
+    silent_setting = silent
     try:
         start_anime_id=int(start_anime_id)
         end_anime_id=int(end_anime_id)
